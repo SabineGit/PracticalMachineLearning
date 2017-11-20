@@ -1,0 +1,116 @@
+---
+title: "Untitled"
+author: "sabine"
+date: "17 November 2017"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("dplyr")
+#install.packages("caret")
+#install.packages("e1071")
+#install.packages("rattle")
+#install.packages("Matrix")
+#install.packages("randomForest")
+#install.packages("ggplot2")
+library(randomForest)
+library(ggplot2)
+library(Matrix)
+library(caret)
+library(dplyr)
+library(e1071)
+library(kernlab)
+library(rpart)
+library(rattle)
+```
+
+
+###Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+####The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+
+###Loading the data
+First we read the test and the quiz data:
+
+```{r load data, echo=TRUE}
+PML <- read.csv(file="C:/Users/Sabine/Documents/R/Course8_PracticalMachineLearning/pml_training.csv")
+PML_Quiz  <- read.csv(file="C:/Users/Sabine/Documents/R/Course8_PracticalMachineLearning/pml-testing.csv")
+```
+
+## shrink dataset
+Next we replace all empty fields with NA. Then We elimiate all Columns that contain mostly NA. We also remove timestamps, username and window. We do that for test and quiz data. Then we cut the training data into 2 parts:
+
+```{r shrink, echo=TRUE}
+PML_Quiz[PML_Quiz == ""] <- NA
+PML_Quiz_reduced<- PML_Quiz[, (colSums(is.na(PML_Quiz)) <20)]
+PML_Quiz_red <-subset( PML_Quiz_reduced,select  = -c(raw_timestamp_part_2,cvtd_timestamp,X, user_name,new_window,num_window))
+
+PML[PML == ""] <- NA
+PML_reduced<- PML[, (colSums(is.na(PML)) < 19215)]
+PML_red<-subset( PML_reduced,select = -c(raw_timestamp_part_2,cvtd_timestamp,X, user_name,new_window,num_window))
+
+#inTrain<-createDataPartition(y=PML_red$classe, p=0.40, list=FALSE)
+inTrain<-createDataPartition(y=PML_red$classe, p=0.010, list=FALSE)
+PML_training  <-PML_red[inTrain,]
+PML_testing   <-PML_red[-inTrain,]
+```
+
+
+## Now we fit some models: a Tree-model, a randomForest-model
+```{r removeNA1, echo=TRUE, include=TRUE, View=FALSE}
+modFit_Tree <- rpart(classe ~ ., data=PML_training, method="class")   # tree
+modFit_Tree
+
+modFit_RF <- train(classe ~ ., data=PML_training, method="rf", prox=TRUE)    # rforest
+modFit_RF
+```
+
+## Predicting of test-data
+Now we use the prediction models to predict PML_Testing. 
+
+```{r predict, echo=TRUE, include=TRUE, View=FALSE}
+PredictTree<-predict(modFit_Tree, newdata= PML_testing, type="class")
+#PredictTree
+PredictnRF<-predict(modFit_RF, newdata= PML_testing, type="raw")
+#PredictnRF
+```
+
+
+##comparison of the models
+We compare values calculated by predicting our models to the values of PML_testing. To Do this we use confusionMatrix:
+
+```{r comparison2, echo=TRUE}
+cm_tree <- confusionMatrix(PredictTree, PML_testing$classe)
+cm_tree
+
+cm_rf <- confusionMatrix(PredictnRF, PML_testing$classe)
+cm_rf
+```
+
+By calculating the confusionMatrix we see that the accuracy of the prediction model "randomForest" (99,6%) is much higher than the accuracy of the prediction model "tree" ( 84,3%). So we conclude that the prediction model "randomForest" is the best to use. 
+
+
+
+## Doing the Quiz
+Now we use the 2 prediction models to predict 20 different test cases. 
+
+```{r predictQuiz, echo=TRUE, include=TRUE, View=FALSE}
+QuizWithTree<-predict(modFit_Tree, newdata= PML_Quiz_red, type="class")
+QuizWithTree 
+
+QuizWithRF<-predict(modFit_RF, newdata= PML_Quiz_red, type="raw")
+QuizWithRF
+```
+
+
+
+## Conclusion
+
+Earlier we saw that the prediction model "randomForest" is the best to use. The same result was obtained when doing the Quiz. When we did the quiz with the data we obtained by the tree-model we got 13/20 right answers which means the quiz was 65% correct. When we did the quiz with the data we obtained by the RandomForest-model we got 20/20 right answers ( 100%) correct. This shows that indeed the random forest-model is the best model
+
